@@ -1,0 +1,301 @@
+.winner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 24px 16px;
+}
+
+.winner__card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 40px 32px;
+  max-width: 580px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.winner__trophy {
+  font-size: 72px;
+  filter: drop-shadow(0 0 30px rgba(250, 204, 21, 0.5));
+  animation: bounce 1s ease-in-out infinite alternate;
+}
+
+@keyframes bounce {
+  from { transform: translateY(0); }
+  to { transform: translateY(-10px); }
+}
+
+.winner__headline {
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+.winner__headline--win {
+  background: linear-gradient(135deg, #facc15, #fb923c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.winner__headline--lose {
+  color: var(--muted);
+}
+
+.winner__headline--draw {
+  background: linear-gradient(135deg, #60a5fa, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.winner__sub {
+  color: var(--muted);
+  font-size: 15px;
+  margin-top: -12px;
+}
+
+/* ── Tiebreaker reason pill ── */
+.winner__reason {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: 20px;
+  margin-top: -8px;
+}
+
+.winner__reason--wpm {
+  background: rgba(108, 99, 255, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(108, 99, 255, 0.25);
+}
+
+.winner__reason--accuracy {
+  background: rgba(74, 222, 128, 0.1);
+  color: var(--green);
+  border: 1px solid rgba(74, 222, 128, 0.25);
+}
+
+.winner__reason--draw {
+  background: rgba(96, 165, 250, 0.1);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.25);
+}
+
+/* ── Stats ── */
+.winner__stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  justify-content: center;
+}
+
+.winner__vs {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.stat-card {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  transition: border-color 0.2s;
+  min-width: 0;
+}
+
+.stat-card--winner {
+  border-color: rgba(250, 204, 21, 0.4);
+  box-shadow: 0 0 20px rgba(250, 204, 21, 0.1);
+}
+
+.stat-card__crown {
+  position: absolute;
+  top: -18px;
+  font-size: 24px;
+  filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.6));
+}
+
+.stat-card__avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+}
+
+.stat-card__avatar--you {
+  background: linear-gradient(135deg, var(--accent), #a78bfa);
+}
+
+.stat-card__avatar--opp {
+  background: linear-gradient(135deg, #f97316, #fb923c);
+}
+
+.stat-card__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
+  word-break: break-word;
+}
+
+/* WPM + ACC side by side */
+.stat-card__stats-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.stat-card__stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 6px;
+}
+
+.stat-card__stat-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.stat-card__num {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1;
+}
+
+.stat-card__unit {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+/* Progress mini-bar */
+.stat-card__progress-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.stat-card__progress-label {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.stat-card__progress-track {
+  flex: 1;
+  height: 6px;
+  background: var(--surface);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.stat-card__progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.3s;
+}
+
+.stat-card__progress-fill--you {
+  background: linear-gradient(90deg, var(--accent), #a78bfa);
+}
+
+.stat-card__progress-fill--opp {
+  background: linear-gradient(90deg, #f97316, #fb923c);
+}
+
+.stat-card__progress-pct {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+  flex-shrink: 0;
+  min-width: 28px;
+  text-align: right;
+}
+
+/* ── Rematch ── */
+.winner__rematch-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.winner__rematch-btn {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 40px;
+  font-size: 16px;
+  font-weight: 600;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.winner__rematch-btn:hover:not(:disabled) {
+  background: #7c74ff;
+  box-shadow: 0 4px 20px var(--accent-glow);
+  transform: translateY(-1px);
+}
+
+.winner__rematch-btn--voted {
+  background: var(--surface2);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.winner__vote-status {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.winner__room-code {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.winner__room-code span {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 2px;
+}
