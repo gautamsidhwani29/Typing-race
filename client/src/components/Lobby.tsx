@@ -19,61 +19,62 @@ const GAMES: {
     emoji: '⌨️',
     name: 'Typing Race',
     description: 'Race to type a paragraph faster than your opponent',
-    color: '#e2b714',
+    color: '#00ff00', // Neon Green
   },
   {
     type: 'trivia',
     emoji: '🧠',
     name: 'Trivia Battle',
     description: 'Answer 10 trivia questions — fastest correct answer wins each round',
-    color: '#60a5fa',
+    color: '#00ccff', // Neon Blue
   },
   {
     type: 'math',
     emoji: '🔢',
     name: 'Math Sprint',
     description: 'Solve 20 math problems before your opponent does',
-    color: '#4ade80',
+    color: '#ffff00', // Neon Yellow
   },
   {
     type: 'minesweeper',
     emoji: '💣',
     name: 'Minesweeper Race',
     description: 'Clear the board without hitting a mine — same board, first to finish wins',
-    color: '#f87171',
+    color: '#ff0033', // Neon Red
   },
 ];
 
 export default function Lobby({ username, queueCounts, onPlay }: Props) {
   return (
     <div className="lobby">
-      <header className="lobby__header">
-        <h1 className="lobby__title">Game Arena</h1>
-        <div className="lobby__user">
-          <span className="lobby__user-dot" />
-          <span className="lobby__username">{username}</span>
+      <header className="lobby__header nes-container is-dark with-title">
+        <p className="title">Game Arena</p>
+        <div className="lobby__header-content">
+          <div className="lobby__user">
+            <i className="nes-bcrikko"></i>
+            <span className="lobby__username">{username}</span>
+          </div>
+          <p className="lobby__subtitle">Select a mission to begin</p>
         </div>
       </header>
-
-      <p className="lobby__subtitle">Choose a game and get matched instantly</p>
 
       <div className="lobby__grid">
         {GAMES.map((game) => (
           <div
             key={game.type}
-            className="game-card"
-            style={{ '--card-color': game.color } as React.CSSProperties}
+            className={`game-card nes-container is-dark with-title`}
           >
-            <div className="game-card__emoji">{game.emoji}</div>
-            <h2 className="game-card__name">{game.name}</h2>
-            <p className="game-card__desc">{game.description}</p>
+            <p className="title" style={{ color: game.color }}>{game.name}</p>
+            <div className="game-card__content">
+              <div className="game-card__emoji">{game.emoji}</div>
+              <p className="game-card__desc">{game.description}</p>
+            </div>
             <div className="game-card__footer">
               <div className="game-card__waiting">
-                <span className="game-card__waiting-dot" />
-                <span>{queueCounts[game.type]} waiting</span>
+                <span className="nes-text is-warning">{queueCounts[game.type]} waiting</span>
               </div>
               <button
-                className="game-card__btn"
+                className="game-card__btn nes-btn is-success"
                 onClick={() => onPlay(game.type)}
               >
                 Play

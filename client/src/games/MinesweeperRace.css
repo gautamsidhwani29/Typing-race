@@ -1,125 +1,91 @@
 .minesweeper {
   width: 100%;
-  max-width: 700px;
+  max-width: 900px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 32px;
 }
 
 .minesweeper__info {
-  font-size: 12px;
-  color: var(--text-dim);
-  font-family: var(--mono);
+  font-size: 10px;
 }
 
 .minesweeper__board {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-  display: inline-flex;
+  display: flex;
   flex-direction: column;
-  gap: 3px;
-  align-self: center;
+  gap: 4px;
+  padding: 16px !important;
+  align-items: center;
 }
 
 .minesweeper__row {
   display: flex;
-  gap: 3px;
+  gap: 4px;
 }
 
 .minesweeper__cell {
-  width: 36px;
-  height: 36px;
-  border-radius: 6px;
-  border: none;
-  font-size: 14px;
+  width: 40px !important;
+  height: 40px !important;
+  padding: 0 !important;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.1s;
-  cursor: pointer;
+  font-size: 16px;
+  min-width: 0 !important;
 }
 
-.minesweeper__cell--hidden {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-}
-
-.minesweeper__cell--hidden:hover:not(:disabled) {
-  background: var(--accent-dim);
-  border-color: var(--accent);
+@media (max-width: 600px) {
+  .minesweeper__cell {
+    width: 30px !important;
+    height: 30px !important;
+    font-size: 12px;
+  }
 }
 
 .minesweeper__cell--revealed {
-  background: var(--bg);
-  border: 1px solid transparent;
-  cursor: default;
-}
-
-.minesweeper__cell--flagged {
-  background: rgba(248,113,113,0.1);
-  border: 1px solid rgba(248,113,113,0.3);
+  background: var(--surface2) !important;
+  border-color: var(--surface2) !important;
+  color: var(--blue) !important;
+  box-shadow: inset 0 0 5px var(--blue);
 }
 
 .minesweeper__cell--mine {
-  background: rgba(248,113,113,0.2);
-  border: 1px solid var(--red);
+  background: var(--red) !important;
+  box-shadow: 0 0 15px var(--red);
+}
+
+.minesweeper__cell--flagged {
+  color: var(--accent) !important;
 }
 
 .minesweeper__progress {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 24px;
 }
 
 .minesweeper__progress-bar {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.minesweeper__progress-meta {
+  display: flex;
+  justify-content: space-between;
 }
 
 .minesweeper__progress-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  min-width: 80px;
-}
-
-.minesweeper__progress-track {
-  flex: 1;
-  height: 10px;
-  background: var(--surface2);
-  border-radius: 99px;
-  overflow: hidden;
-}
-
-.minesweeper__progress-fill {
-  height: 100%;
-  border-radius: 99px;
-  transition: width 0.3s ease-out;
-}
-
-.minesweeper__progress-fill--you {
-  background: linear-gradient(90deg, var(--accent), #f0d060);
-  box-shadow: 0 0 8px var(--accent-glow);
-}
-
-.minesweeper__progress-fill--opp {
-  background: linear-gradient(90deg, var(--blue), #93c5fd);
+  font-size: 8px;
+  color: var(--white);
 }
 
 .minesweeper__progress-pct {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 8px;
   color: var(--text-dim);
-  font-family: var(--mono);
-  min-width: 36px;
-  text-align: right;
 }
 
 .minesweeper__hint {
+  font-size: 10px;
   text-align: center;
-  font-size: 12px;
-  color: var(--text-dim);
 }

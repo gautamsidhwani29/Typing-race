@@ -15,25 +15,28 @@ export default function UsernameScreen({ onSubmit }: Props) {
 
   return (
     <div className="username-screen">
-      <div className="username-screen__content">
-        <h1 className="username-screen__title">
-          <span className="username-screen__emoji">🎮</span>
-          Game Arena
-        </h1>
-        <p className="username-screen__subtitle">Enter your username to start</p>
+      <div className="username-screen__content nes-container is-dark with-title">
+        <p className="title">Game Arena</p>
+        <div className="username-screen__icon">
+          <i className="nes-icon logo is-large"></i>
+        </div>
+        <p className="username-screen__subtitle">Enter username to start</p>
         <form onSubmit={handleSubmit} className="username-screen__form">
-          <input
-            type="text"
-            className="username-screen__input"
-            placeholder="Your username..."
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            maxLength={20}
-            autoFocus
-          />
+          <div className="nes-field">
+            <input
+              type="text"
+              id="name_field"
+              className="username-screen__input nes-input is-dark"
+              placeholder="Your username..."
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              maxLength={20}
+              autoFocus
+            />
+          </div>
           <button
             type="submit"
-            className="username-screen__btn"
+            className={`username-screen__btn nes-btn ${!value.trim() ? 'is-disabled' : 'is-primary'}`}
             disabled={!value.trim()}
           >
             Continue

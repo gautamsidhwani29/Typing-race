@@ -17,9 +17,9 @@ const GAME_NAMES: Record<GameType, string> = {
 export default function CountdownOverlay({ count, gameType, opponent }: Props) {
   return (
     <div className="countdown-overlay">
-      <p className="countdown-overlay__vs">vs {opponent}</p>
+      <p className="countdown-overlay__vs nes-text is-disabled">vs {opponent}</p>
       <div className="countdown-overlay__num" key={count}>{count}</div>
-      <p className="countdown-overlay__game">{GAME_NAMES[gameType]}</p>
+      <p className="countdown-overlay__game nes-text is-primary">{GAME_NAMES[gameType]}</p>
     </div>
   );
 }

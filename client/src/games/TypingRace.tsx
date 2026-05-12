@@ -106,13 +106,14 @@ export default function TypingRace({ socket, myId, username, opponent, gameData 
         }
       />
 
-      <div className="typing-race__progress-section">
-        <ProgressBar label={username} progress={myProgress} isYou />
-        <ProgressBar label={opponent} progress={oppProgress} isYou={false} />
+      <div className="typing-race__progress-section nes-container is-dark with-title">
+        <p className="title">Progress</p>
+        <ProgressBar label={username} progress={myProgress} type="is-success" />
+        <ProgressBar label={opponent} progress={oppProgress} type="is-primary" />
       </div>
 
       <div
-        className={`typing-race__textbox ${timeUp || finished ? 'typing-race__textbox--disabled' : ''}`}
+        className={`typing-race__textbox nes-container is-dark ${timeUp || finished ? 'typing-race__textbox--disabled' : ''}`}
         onClick={() => inputRef.current?.focus()}
       >
         <p className="typing-race__paragraph">
@@ -139,36 +140,24 @@ export default function TypingRace({ socket, myId, username, opponent, gameData 
       />
 
       <div className="typing-race__stats">
-        <span>WPM: <strong>{wpm}</strong></span>
-        <span>Accuracy: <strong>{accuracy}%</strong></span>
-        <span>Progress: <strong>{myProgress}%</strong></span>
+        <span>WPM: <span className="nes-text is-warning">{wpm}</span></span>
+        <span>ACC: <span className="nes-text is-warning">{accuracy}%</span></span>
       </div>
 
-      {finished && <div className="typing-race__banner typing-race__banner--done">✓ Finished! Waiting for opponent...</div>}
-      {timeUp && !finished && <div className="typing-race__banner typing-race__banner--timeout">⏱ Time's up!</div>}
+      {finished && <div className="typing-race__banner nes-text is-success">✓ Mission Complete!</div>}
+      {timeUp && !finished && <div className="typing-race__banner nes-text is-error">⏱ Time Expired!</div>}
     </div>
   );
 }
 
-function ProgressBar({ label, progress, isYou }: { label: string; progress: number; isYou: boolean }) {
+function ProgressBar({ label, progress, type }: { label: string; progress: number; type: string }) {
   return (
     <div className="typing-pb">
       <div className="typing-pb__meta">
         <span className="typing-pb__label">{label}</span>
         <span className="typing-pb__pct">{progress}%</span>
       </div>
-      <div className="typing-pb__track">
-        <div
-          className={`typing-pb__fill ${isYou ? 'typing-pb__fill--you' : 'typing-pb__fill--opp'}`}
-          style={{ width: `${progress}%` }}
-        />
-        <span
-          className="typing-pb__car"
-          style={{ left: `${Math.min(progress, 97)}%` }}
-        >
-          {isYou ? '🚀' : '🏎️'}
-        </span>
-      </div>
+      <progress className={`nes-progress ${type}`} value={progress} max="100"></progress>
     </div>
   );
 }

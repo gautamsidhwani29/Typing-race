@@ -92,18 +92,16 @@ export default function TriviaBattle({ socket, myId, username, opponent }: Props
         myScore={myScore}
         oppName={opponent}
         oppScore={oppScore}
-        extra={<span className="trivia__qnum">Q {questionNum} / 10</span>}
+        extra={<span className="trivia__qnum nes-text is-primary">Q {questionNum} / 10</span>}
       />
 
       {currentQ ? (
-        <div className="trivia__card">
-          <div className="trivia__timer-bar">
-            <div
-              className="trivia__timer-fill"
-              style={{ width: `${timerPct}%`, background: timerColor }}
-            />
+        <div className="trivia__card nes-container is-dark with-title">
+          <p className="title">Round {questionNum}</p>
+          <div className="trivia__timer-section">
+            <progress className={`nes-progress ${timeLeft > 8 ? 'is-success' : timeLeft > 4 ? 'is-warning' : 'is-error'}`} value={timeLeft} max="15"></progress>
+            <div className="trivia__timer-num">{timeLeft}s</div>
           </div>
-          <div className="trivia__timer-num" style={{ color: timerColor }}>{timeLeft}s</div>
 
           <p
             className="trivia__question"
@@ -111,19 +109,16 @@ export default function TriviaBattle({ socket, myId, username, opponent }: Props
           />
 
           <div className="trivia__options">
-            {currentQ.options.map((opt) => {
-              let cls = 'trivia__option';
-              if (selected) {
-                if (opt === selected) {
-                  cls += result?.correct ? ' trivia__option--correct' : ' trivia__option--wrong';
-                } else if (result && !result.correct && opt === currentQ.options.find(o => o !== selected)) {
-                  // don't highlight others
-                }
+            {currentQ.options.map((opt, idx) => {
+              const colors = ['is-primary', 'is-success', 'is-warning', 'is-error'];
+              let type = colors[idx % colors.length];
+              if (selected === opt) {
+                type = result?.correct ? 'is-success' : 'is-error';
               }
               return (
                 <button
                   key={opt}
-                  className={cls}
+                  className={`trivia__option nes-btn ${type} ${selected && selected !== opt ? 'is-disabled' : ''}`}
                   onClick={() => handleAnswer(opt)}
                   disabled={!!selected}
                   dangerouslySetInnerHTML={{ __html: opt }}
@@ -133,14 +128,14 @@ export default function TriviaBattle({ socket, myId, username, opponent }: Props
           </div>
 
           {result && (
-            <div className={`trivia__feedback ${result.correct ? 'trivia__feedback--correct' : 'trivia__feedback--wrong'}`}>
+            <div className={`trivia__feedback nes-text ${result.correct ? 'is-success' : 'is-error'}`}>
               {result.correct ? '✓ Correct!' : '✗ Wrong!'}
             </div>
           )}
         </div>
       ) : (
         <div className="trivia__waiting">
-          <div className="trivia__spinner" />
+          <i className="nes-icon coin is-large"></i>
           <p>Loading question...</p>
         </div>
       )}

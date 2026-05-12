@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -7,41 +7,63 @@
 }
 
 :root {
-  --bg:        #0f0f0f;
-  --surface:   #1a1a1a;
-  --surface2:  #242424;
-  --border:    #2e2e2e;
-  --accent:    #e2b714;
-  --accent-dim: rgba(226, 183, 20, 0.15);
-  --accent-glow: rgba(226, 183, 20, 0.35);
-  --green:     #4ade80;
-  --red:       #f87171;
-  --blue:      #60a5fa;
-  --text:      #d1d0c5;
-  --text-dim:  #646669;
+  --bg:        #1a1a1a;
+  --surface:   #212529;
+  --surface2:  #343a40;
+  --border:    #ffffff;
+  --accent:    #ffff00;
+  --accent-dim: rgba(255, 255, 0, 0.2);
+  --accent-glow: rgba(255, 255, 0, 0.6);
+  --green:     #00ff00;
+  --red:       #ff0033;
+  --blue:      #00ccff;
+  --purple:    #cc00ff;
+  --orange:    #ff9900;
+  --text:      #ffffff;
+  --text-dim:  #cccccc;
   --white:     #ffffff;
+  --retro-font: 'Press Start 2P', cursive;
   --mono:      'JetBrains Mono', monospace;
-}
-
-html, body, #root {
-  height: 100%;
 }
 
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Inter', sans-serif;
+  font-family: var(--retro-font);
   min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
+  -webkit-font-smoothing: none;
+  line-height: 1.6;
 }
 
 button {
   cursor: pointer;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--retro-font);
 }
 
 input {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--retro-font);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%,
+    rgba(0, 0, 0, 0.1) 50%
+  ),
+  linear-gradient(
+    90deg,
+    rgba(255, 0, 0, 0.03),
+    rgba(0, 255, 0, 0.01),
+    rgba(0, 0, 255, 0.03)
+  );
+  background-size: 100% 3px, 3px 100%;
+  pointer-events: none;
+  z-index: 9999;
 }
 
 ::-webkit-scrollbar {

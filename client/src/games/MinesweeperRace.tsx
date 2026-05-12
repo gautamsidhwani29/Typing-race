@@ -76,46 +76,48 @@ export default function MinesweeperRace({ socket, myId, username, opponent, game
         myScore={`${myPct}%`}
         oppName={opponent}
         oppScore={`${oppPct}%`}
-        extra={<span className="minesweeper__info">{myScore} / {totalSafe} safe cells</span>}
+        extra={<span className="minesweeper__info nes-text is-warning">{myScore} / {totalSafe}</span>}
       />
 
-      <div className="minesweeper__board">
+      <div className="minesweeper__board nes-container is-dark">
         {board.map((row, r) => (
           <div key={r} className="minesweeper__row">
             {row.map((cell, c) => (
               <button
                 key={c}
-                className={`minesweeper__cell minesweeper__cell--${cell}`}
+                className={`minesweeper__cell minesweeper__cell--${cell} nes-btn ${cell === 'hidden' ? '' : 'is-disabled'}`}
                 onClick={() => handleReveal(r, c)}
                 onContextMenu={(e) => handleFlag(e, r, c)}
                 disabled={gameOver}
               >
                 {cell === 'flagged' && '🚩'}
                 {cell === 'mine' && '💣'}
+                {cell === 'revealed' && ''}
               </button>
             ))}
           </div>
         ))}
       </div>
 
-      <div className="minesweeper__progress">
+      <div className="minesweeper__progress nes-container is-dark with-title">
+        <p className="title">Progress</p>
         <div className="minesweeper__progress-bar">
-          <div className="minesweeper__progress-label">{username}</div>
-          <div className="minesweeper__progress-track">
-            <div className="minesweeper__progress-fill minesweeper__progress-fill--you" style={{ width: `${myPct}%` }} />
+          <div className="minesweeper__progress-meta">
+            <span className="minesweeper__progress-label">{username}</span>
+            <span className="minesweeper__progress-pct">{myPct}%</span>
           </div>
-          <div className="minesweeper__progress-pct">{myPct}%</div>
+          <progress className="nes-progress is-success" value={myPct} max="100"></progress>
         </div>
         <div className="minesweeper__progress-bar">
-          <div className="minesweeper__progress-label">{opponent}</div>
-          <div className="minesweeper__progress-track">
-            <div className="minesweeper__progress-fill minesweeper__progress-fill--opp" style={{ width: `${oppPct}%` }} />
+          <div className="minesweeper__progress-meta">
+            <span className="minesweeper__progress-label">{opponent}</span>
+            <span className="minesweeper__progress-pct">{oppPct}%</span>
           </div>
-          <div className="minesweeper__progress-pct">{oppPct}%</div>
+          <progress className="nes-progress is-primary" value={oppPct} max="100"></progress>
         </div>
       </div>
 
-      <p className="minesweeper__hint">Left-click to reveal • Right-click to flag</p>
+      <p className="minesweeper__hint nes-text is-disabled">Left: reveal • Right: flag</p>
     </div>
   );
 }

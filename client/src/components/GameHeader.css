@@ -2,18 +2,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px 24px;
-  margin-bottom: 24px;
+  padding: 16px 20px !important;
+  margin-bottom: 32px;
 }
 
 .game-header__player {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-width: 120px;
+  gap: 8px;
+  min-width: 100px;
 }
 
 .game-header__player--you {
@@ -25,16 +22,11 @@
 }
 
 .game-header__name {
-  font-size: 13px;
-  color: var(--text-dim);
-  font-weight: 600;
+  font-size: 8px;
 }
 
 .game-header__score {
-  font-size: 28px;
-  font-weight: 800;
-  color: var(--accent);
-  font-family: var(--mono);
+  font-size: 16px;
   line-height: 1;
 }
 
@@ -42,13 +34,12 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 .game-header__title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text);
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  font-size: 10px;
+  color: var(--white);
+  text-align: center;
 }
+
