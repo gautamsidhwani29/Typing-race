@@ -1,0 +1,120 @@
+.game-over {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.game-over__card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 48px 40px;
+  max-width: 500px;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.game-over__trophy {
+  font-size: 80px;
+  filter: drop-shadow(0 0 30px var(--accent-glow));
+  animation: trophy-bounce 1s ease-in-out infinite alternate;
+}
+
+@keyframes trophy-bounce {
+  from { transform: translateY(0); }
+  to { transform: translateY(-10px); }
+}
+
+.game-over__title {
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: -1px;
+}
+
+.game-over__title--win {
+  color: var(--accent);
+}
+
+.game-over__title--lose {
+  color: var(--text-dim);
+}
+
+.game-over__subtitle {
+  color: var(--text-dim);
+  font-size: 16px;
+  margin-top: -12px;
+}
+
+.game-over__stats {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+  justify-content: center;
+  margin: 8px 0;
+}
+
+.game-over__player {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.game-over__player--winner {
+  border-color: var(--accent);
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.game-over__player-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.game-over__player-score {
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--accent);
+  font-family: var(--mono);
+}
+
+.game-over__player-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.game-over__vs {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.game-over__btn {
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 12px;
+  padding: 14px 40px;
+  font-size: 16px;
+  font-weight: 700;
+  transition: all 0.2s;
+  margin-top: 8px;
+}
+
+.game-over__btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px var(--accent-glow);
+}

@@ -2,193 +2,394 @@ import express from 'express';
 import http from 'http';
 import { Server, Socket } from 'socket.io';
 import cors from 'cors';
+import axios from 'axios';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface Player {
-  id: string;
-  name: string;
-  progress: number;
-  wpm: number;
-  accuracy: number;
-  finished: boolean;
-  finishTime: number | null;
+type GameType = 'typing' | 'trivia' | 'math' | 'minesweeper';
+
+interface QueuedPlayer {
+  socketId: string;
+  username: string;
+  gameType: GameType;
 }
 
-interface Room {
-  code: string;
-  paragraph: string;
-  players: Record<string, Player>;
+interface MatchPlayer {
+  id: string;
+  username: string;
+  score: number;
+  finished: boolean;
+}
+
+interface Match {
+  matchId: string;
+  gameType: GameType;
+  players: Record<string, MatchPlayer>;
+  gameData: any;
   started: boolean;
   ended: boolean;
-  startTime: number | null;
-  roundTimer: ReturnType<typeof setInterval> | null;
-  rematchVotes: Set<string>;
 }
-
-interface PublicRoom {
-  code: string;
-  paragraph: string;
-  started: boolean;
-  players: Player[];
-}
-
-interface WinResult {
-  winnerId: string | null;
-  winnerName: string | null;
-  reason: 'wpm' | 'accuracy' | 'draw';
-  isDraw: boolean;
-}
-
-// ── Socket event maps ─────────────────────────────────────────────────────────
 
 interface ClientToServerEvents {
-  create_room: (data: { playerName: string }) => void;
-  join_room: (data: { roomCode: string; playerName: string }) => void;
-  progress_update: (data: {
-    progress: number;
-    wpm: number;
-    accuracy: number;
-    finished: boolean;
-  }) => void;
-  rematch_vote: () => void;
+  set_username:       (data: { username: string }) => void;
+  join_queue:         (data: { gameType: GameType }) => void;
+  leave_queue:        () => void;
+  typing_progress:    (data: { progress: number; wpm: number; accuracy: number; finished: boolean }) => void;
+  trivia_answer:      (data: { questionIndex: number; answer: string }) => void;
+  math_answer:        (data: { problemIndex: number; answer: number }) => void;
+  minesweeper_reveal: (data: { row: number; col: number }) => void;
+  minesweeper_flag:   (data: { row: number; col: number }) => void;
 }
 
 interface ServerToClientEvents {
-  room_joined: (data: { room: PublicRoom; playerId: string }) => void;
-  countdown: (data: { count: number }) => void;
-  race_start: (data: { startTime: number; paragraph: string; duration: number }) => void;
-  timer_tick: (data: { remaining: number }) => void;
-  room_update: (data: { players: Player[] }) => void;
-  race_over: (data: WinResult & { players: Player[] }) => void;
-  rematch_votes: (data: { count: number; total: number }) => void;
-  rematch_start: (data: { room: PublicRoom }) => void;
-  player_left: (data: { playerId: string }) => void;
-  error: (data: { message: string }) => void;
+  queue_counts:          (data: { typing: number; trivia: number; math: number; minesweeper: number }) => void;
+  match_found:           (data: { matchId: string; gameType: GameType; opponent: string }) => void;
+  countdown:             (data: { count: number }) => void;
+  game_start:            (data: { gameData: any }) => void;
+  opponent_disconnected: () => void;
+  typing_update:         (data: { players: MatchPlayer[] }) => void;
+  typing_timer:          (data: { remaining: number }) => void;
+  trivia_question:       (data: { questionIndex: number; question: string; options: string[]; timeLimit: number }) => void;
+  trivia_answer_result:  (data: { playerId: string; correct: boolean }) => void;
+  trivia_scores:         (data: { players: MatchPlayer[] }) => void;
+  math_problem:          (data: { problemIndex: number; problem: string }) => void;
+  math_correct:          (data: { playerId: string; problemIndex: number }) => void;
+  math_scores:           (data: { players: MatchPlayer[] }) => void;
+  minesweeper_update:    (data: { playerId: string; revealedCount: number; hitMine: boolean }) => void;
+  minesweeper_progress:  (data: { players: MatchPlayer[] }) => void;
+  game_over:             (data: { winnerId: string; winnerName: string; players: MatchPlayer[] }) => void;
+  error:                 (data: { message: string }) => void;
 }
 
 interface SocketData {
-  roomCode?: string;
+  username?: string;
+  matchId?: string;
+  gameType?: GameType;
 }
 
-// ── Config ────────────────────────────────────────────────────────────────────
+// ── In-memory state ───────────────────────────────────────────────────────────
 
-const ROUND_DURATION = 30; // seconds
+const queues: Record<GameType, QueuedPlayer[]> = {
+  typing: [], trivia: [], math: [], minesweeper: [],
+};
 
-// ── Paragraphs ────────────────────────────────────────────────────────────────
+// Track which games are currently being set up to prevent double-matching
+const matchingInProgress = new Set<GameType>();
 
-const PARAGRAPHS: string[] = [
-  'The quick brown fox jumps over the lazy dog near the riverbank while the sun sets behind the mountains casting long shadows across the valley floor.',
-  'Programming is the art of telling another human what one wants the computer to do. It requires patience, logic, and a deep understanding of how systems work together.',
-  'In the middle of difficulty lies opportunity. Every challenge we face is a chance to grow stronger, think deeper, and emerge with a better understanding of ourselves.',
-  'The universe is under no obligation to make sense to you. Science is not a collection of facts but a method of asking and answering questions about the natural world.',
-  'Success is not final, failure is not fatal: it is the courage to continue that counts. Every step forward, no matter how small, brings you closer to your destination.',
-  'Technology is best when it brings people together. The internet has connected billions of minds across the globe, enabling collaboration on a scale never before imagined.',
-  'A journey of a thousand miles begins with a single step. The hardest part of any endeavor is simply starting, pushing past the inertia of comfort and routine.',
-  'The only way to do great work is to love what you do. Find your passion, nurture it daily, and let it guide every decision you make in your professional life.',
-];
+const matches: Record<string, Match> = {};
 
-// ── In-memory rooms ───────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-const rooms: Record<string, Room> = {};
-
-function randomParagraph(): string {
-  return PARAGRAPHS[Math.floor(Math.random() * PARAGRAPHS.length)];
+function generateMatchId(): string {
+  return Math.random().toString(36).substring(2, 10).toUpperCase();
 }
 
-function generateCode(): string {
-  return Math.random().toString(36).substring(2, 7).toUpperCase();
-}
-
-function freshPlayer(id: string, name: string): Player {
-  return { id, name, progress: 0, wpm: 0, accuracy: 100, finished: false, finishTime: null };
-}
-
-function getPublicRoom(room: Room): PublicRoom {
+function getQueueCounts() {
   return {
-    code: room.code,
-    paragraph: room.paragraph,
-    started: room.started,
-    players: Object.values(room.players),
+    typing:      queues.typing.length,
+    trivia:      queues.trivia.length,
+    math:        queues.math.length,
+    minesweeper: queues.minesweeper.length,
   };
 }
 
-/**
- * Determine winner by WPM, tiebreak by accuracy.
- */
-function determineWinner(players: Player[]): WinResult {
-  const [a, b] = players;
-
-  if (a.wpm > b.wpm) return { winnerId: a.id, winnerName: a.name, reason: 'wpm', isDraw: false };
-  if (b.wpm > a.wpm) return { winnerId: b.id, winnerName: b.name, reason: 'wpm', isDraw: false };
-
-  if (a.accuracy > b.accuracy)
-    return { winnerId: a.id, winnerName: a.name, reason: 'accuracy', isDraw: false };
-  if (b.accuracy > a.accuracy)
-    return { winnerId: b.id, winnerName: b.name, reason: 'accuracy', isDraw: false };
-
-  return { winnerId: null, winnerName: null, reason: 'draw', isDraw: true };
+function removeFromAllQueues(socketId: string) {
+  for (const gt of Object.keys(queues) as GameType[]) {
+    queues[gt] = queues[gt].filter((p) => p.socketId !== socketId);
+  }
 }
 
-function endRound(code: string): void {
-  const room = rooms[code];
-  if (!room || room.ended) return;
-  room.ended = true;
+// ── Game data generators ──────────────────────────────────────────────────────
 
-  if (room.roundTimer) {
-    clearInterval(room.roundTimer);
-    room.roundTimer = null;
+const TYPING_PARAGRAPHS = [
+  'The quick brown fox jumps over the lazy dog near the riverbank while the sun sets behind the mountains casting long shadows across the valley floor.',
+  'Programming is the art of telling another human what one wants the computer to do. It requires patience, logic, and a deep understanding of how systems work together.',
+  'In the middle of difficulty lies opportunity. Every challenge we face is a chance to grow stronger, think deeper, and emerge with a better understanding of ourselves.',
+  'Technology is best when it brings people together. The internet has connected billions of minds across the globe, enabling collaboration on a scale never before imagined.',
+  'Success is not final, failure is not fatal: it is the courage to continue that counts. Every step forward, no matter how small, brings you closer to your destination.',
+];
+
+function generateTypingData() {
+  return {
+    paragraph: TYPING_PARAGRAPHS[Math.floor(Math.random() * TYPING_PARAGRAPHS.length)],
+    duration: 30,
+  };
+}
+
+async function generateTriviaData() {
+  try {
+    const res = await axios.get(
+      'https://opentdb.com/api.php?amount=10&type=multiple',
+      { timeout: 5000 }
+    );
+    const questions = res.data.results.map((q: any) => ({
+      question: q.question,
+      correct:  q.correct_answer,
+      options:  [...q.incorrect_answers, q.correct_answer].sort(() => Math.random() - 0.5),
+    }));
+    return { questions, currentQuestion: 0 };
+  } catch {
+    // Fallback so the game still works offline
+    return {
+      questions: [
+        { question: 'What is the capital of France?',    correct: 'Paris',    options: ['London', 'Berlin', 'Paris', 'Madrid'] },
+        { question: 'How many sides does a hexagon have?', correct: '6',      options: ['5', '6', '7', '8'] },
+        { question: 'What is 7 × 8?',                    correct: '56',       options: ['48', '54', '56', '64'] },
+        { question: 'Which planet is closest to the Sun?', correct: 'Mercury', options: ['Venus', 'Earth', 'Mercury', 'Mars'] },
+        { question: 'What is the chemical symbol for water?', correct: 'H₂O', options: ['CO₂', 'H₂O', 'O₂', 'NaCl'] },
+      ],
+      currentQuestion: 0,
+    };
+  }
+}
+
+function generateMathData() {
+  const problems: { problem: string; answer: number }[] = [];
+  for (let i = 0; i < 20; i++) {
+    const op = ['+', '-', '*'][Math.floor(Math.random() * 3)];
+    let problem: string, answer: number;
+    if (op === '*') {
+      const a = Math.floor(Math.random() * 12) + 1;
+      const b = Math.floor(Math.random() * 12) + 1;
+      problem = `${a} × ${b}`;
+      answer  = a * b;
+    } else if (op === '+') {
+      const a = Math.floor(Math.random() * 99) + 1;
+      const b = Math.floor(Math.random() * 99) + 1;
+      problem = `${a} + ${b}`;
+      answer  = a + b;
+    } else {
+      const a = Math.floor(Math.random() * 99) + 1;
+      const b = Math.floor(Math.random() * a) + 1; // ensure non-negative result
+      problem = `${a} - ${b}`;
+      answer  = a - b;
+    }
+    problems.push({ problem, answer });
+  }
+  return { problems, currentProblem: 0 };
+}
+
+function generateMinesweeperData() {
+  const size = 10, mineCount = 15;
+  const board: boolean[][] = Array.from({ length: size }, () => Array(size).fill(false));
+  let placed = 0;
+  while (placed < mineCount) {
+    const r = Math.floor(Math.random() * size);
+    const c = Math.floor(Math.random() * size);
+    if (!board[r][c]) { board[r][c] = true; placed++; }
+  }
+  return { board, size, mineCount };
+}
+
+// ── Matchmaking ───────────────────────────────────────────────────────────────
+
+/**
+ * Try to pair two players from the queue.
+ * Uses a lock per game type to prevent concurrent async calls from
+ * double-consuming the same players.
+ */
+async function tryMatch(gameType: GameType): Promise<void> {
+  // Prevent re-entrant calls while we await trivia fetch
+  if (matchingInProgress.has(gameType)) return;
+  if (queues[gameType].length < 2) return;
+
+  matchingInProgress.add(gameType);
+  try {
+    // Re-check after acquiring lock
+    if (queues[gameType].length < 2) return;
+
+    const [p1, p2] = queues[gameType].splice(0, 2);
+    const matchId  = generateMatchId();
+
+    // Generate game data (may be async for trivia)
+    let gameData: any;
+    if (gameType === 'typing')      gameData = generateTypingData();
+    else if (gameType === 'trivia') gameData = await generateTriviaData();
+    else if (gameType === 'math')   gameData = generateMathData();
+    else                            gameData = generateMinesweeperData();
+
+    // Verify both sockets are still connected
+    const s1 = io.sockets.sockets.get(p1.socketId);
+    const s2 = io.sockets.sockets.get(p2.socketId);
+
+    if (!s1 || !s2) {
+      // One player disconnected while we were fetching — put the live one back
+      if (s1) queues[gameType].unshift(p1);
+      if (s2) queues[gameType].unshift(p2);
+      console.log(`Match aborted — a player disconnected during setup (${gameType})`);
+      return;
+    }
+
+    matches[matchId] = {
+      matchId,
+      gameType,
+      players: {
+        [p1.socketId]: { id: p1.socketId, username: p1.username, score: 0, finished: false },
+        [p2.socketId]: { id: p2.socketId, username: p2.username, score: 0, finished: false },
+      },
+      gameData,
+      started: false,
+      ended:   false,
+    };
+
+    // Attach match metadata to sockets
+    s1.data.matchId   = matchId;
+    s1.data.gameType  = gameType;
+    s2.data.matchId   = matchId;
+    s2.data.gameType  = gameType;
+
+    s1.join(matchId);
+    s2.join(matchId);
+
+    console.log(`Match ${matchId}: ${p1.username} vs ${p2.username} (${gameType})`);
+
+    // Tell each player who they're facing
+    s1.emit('match_found', { matchId, gameType, opponent: p2.username });
+    s2.emit('match_found', { matchId, gameType, opponent: p1.username });
+
+    // Countdown: 3 → 2 → 1 → game_start
+    // Delay the first tick slightly so clients have time to handle match_found
+    let count = 3;
+    const sendTick = () => {
+      io.to(matchId).emit('countdown', { count });
+      if (count > 1) {
+        count--;
+        setTimeout(sendTick, 1000);
+      } else {
+        // count === 1 was just sent; wait 1 more second then start
+        setTimeout(() => {
+          if (!matches[matchId]) return; // match was cleaned up (disconnect)
+          matches[matchId].started = true;
+          io.to(matchId).emit('game_start', { gameData });
+
+          if (gameType === 'typing')      startTypingGame(matchId);
+          else if (gameType === 'trivia') startTriviaGame(matchId);
+          else if (gameType === 'math')   startMathGame(matchId);
+          // minesweeper is fully client-driven; server just reacts to reveals
+        }, 1000);
+      }
+    };
+    // Small initial delay so match_found is processed first
+    setTimeout(sendTick, 200);
+
+  } finally {
+    matchingInProgress.delete(gameType);
+    // If more players queued up while we were busy, try again
+    if (queues[gameType].length >= 2) tryMatch(gameType);
+  }
+}
+
+// ── Game engines ──────────────────────────────────────────────────────────────
+
+function startTypingGame(matchId: string) {
+  const match = matches[matchId];
+  if (!match) return;
+
+  let remaining = match.gameData.duration as number;
+  const timer = setInterval(() => {
+    if (!matches[matchId]) { clearInterval(timer); return; }
+    remaining--;
+    io.to(matchId).emit('typing_timer', { remaining });
+    if (remaining <= 0) {
+      clearInterval(timer);
+      endTypingGame(matchId);
+    }
+  }, 1000);
+}
+
+function endTypingGame(matchId: string) {
+  const match = matches[matchId];
+  if (!match || match.ended) return;
+  match.ended = true;
+
+  const players = Object.values(match.players);
+  // Highest WPM wins; tie → both get same score so pick first
+  const winner = players.reduce((a, b) => (a.score >= b.score ? a : b));
+  io.to(matchId).emit('game_over', { winnerId: winner.id, winnerName: winner.username, players });
+}
+
+function startTriviaGame(matchId: string) {
+  sendNextTriviaQuestion(matchId);
+}
+
+// Per-match answer tracking: questionIndex → Set of socketIds that answered
+const triviaAnswered: Record<string, Record<number, Set<string>>> = {};
+
+function sendNextTriviaQuestion(matchId: string) {
+  const match = matches[matchId];
+  if (!match || match.ended) return;
+
+  const { questions, currentQuestion } = match.gameData;
+  if (currentQuestion >= questions.length) {
+    endTriviaGame(matchId);
+    return;
   }
 
-  const players = Object.values(room.players);
-  const result = determineWinner(players);
+  // Init answer tracker for this question
+  if (!triviaAnswered[matchId]) triviaAnswered[matchId] = {};
+  triviaAnswered[matchId][currentQuestion] = new Set();
 
-  io.to(code).emit('race_over', { ...result, players });
-  console.log(`Room ${code} round ended — winner: ${result.winnerName ?? 'DRAW'} (${result.reason})`);
-}
-
-function startRound(code: string): void {
-  const room = rooms[code];
-  if (!room) return;
-
-  room.started = true;
-  room.ended = false;
-  room.startTime = Date.now();
-
-  io.to(code).emit('race_start', {
-    startTime: room.startTime,
-    paragraph: room.paragraph,
-    duration: ROUND_DURATION,
+  const q = questions[currentQuestion];
+  io.to(matchId).emit('trivia_question', {
+    questionIndex: currentQuestion,
+    question:      q.question,
+    options:       q.options,
+    timeLimit:     15,
   });
 
-  let remaining = ROUND_DURATION;
-  room.roundTimer = setInterval(() => {
-    remaining -= 1;
-    io.to(code).emit('timer_tick', { remaining });
-    if (remaining <= 0) {
-      clearInterval(room.roundTimer!);
-      room.roundTimer = null;
-      endRound(code);
+  // Auto-advance after time limit even if no one answers
+  setTimeout(() => {
+    const m = matches[matchId];
+    if (!m || m.ended) return;
+    if (m.gameData.currentQuestion === currentQuestion) {
+      m.gameData.currentQuestion++;
+      sendNextTriviaQuestion(matchId);
     }
-  }, 1000);
+  }, 16000); // 15s + 1s buffer
 }
 
-function startCountdown(code: string): void {
-  const room = rooms[code];
-  if (!room) return;
+function endTriviaGame(matchId: string) {
+  const match = matches[matchId];
+  if (!match || match.ended) return;
+  match.ended = true;
+  delete triviaAnswered[matchId];
 
-  let countdown = 3;
-  io.to(code).emit('countdown', { count: countdown });
+  const players = Object.values(match.players);
+  const winner  = players.reduce((a, b) => (a.score >= b.score ? a : b));
+  io.to(matchId).emit('game_over', { winnerId: winner.id, winnerName: winner.username, players });
+}
 
-  const interval = setInterval(() => {
-    countdown -= 1;
-    if (countdown > 0) {
-      io.to(code).emit('countdown', { count: countdown });
-    } else {
-      clearInterval(interval);
-      startRound(code);
+function startMathGame(matchId: string) {
+  // Each player gets their own problem pointer — send the first problem
+  const match = matches[matchId];
+  if (!match) return;
+
+  // Give each player their own progress counter
+  for (const p of Object.values(match.players)) {
+    (p as any).problemIndex = 0;
+  }
+
+  // Send first problem to each player individually
+  for (const [sid] of Object.entries(match.players)) {
+    const s = io.sockets.sockets.get(sid);
+    if (s) {
+      const prob = match.gameData.problems[0];
+      s.emit('math_problem', { problemIndex: 0, problem: prob.problem });
     }
-  }, 1000);
+  }
+}
+
+function endMathGame(matchId: string, winnerId: string) {
+  const match = matches[matchId];
+  if (!match || match.ended) return;
+  match.ended = true;
+
+  const winner = match.players[winnerId];
+  io.to(matchId).emit('game_over', {
+    winnerId:   winner.id,
+    winnerName: winner.username,
+    players:    Object.values(match.players),
+  });
 }
 
 // ── Express + Socket.io setup ─────────────────────────────────────────────────
@@ -202,116 +403,183 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents, Record<string,
   { cors: { origin: '*', methods: ['GET', 'POST'] } }
 );
 
-// ── Socket handlers ───────────────────────────────────────────────────────────
+// Broadcast live queue counts every 2 seconds
+setInterval(() => io.emit('queue_counts', getQueueCounts()), 2000);
+
+// ── Socket event handlers ─────────────────────────────────────────────────────
 
 io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>) => {
   console.log('connected:', socket.id);
 
-  socket.on('create_room', ({ playerName }) => {
-    const code = generateCode();
-    rooms[code] = {
-      code,
-      paragraph: randomParagraph(),
-      players: { [socket.id]: freshPlayer(socket.id, playerName || 'Player 1') },
-      started: false,
-      ended: false,
-      startTime: null,
-      roundTimer: null,
-      rematchVotes: new Set(),
-    };
-    socket.join(code);
-    socket.data.roomCode = code;
-    socket.emit('room_joined', { room: getPublicRoom(rooms[code]), playerId: socket.id });
-    console.log(`Room ${code} created by ${socket.id}`);
+  // Send current counts immediately on connect
+  socket.emit('queue_counts', getQueueCounts());
+
+  socket.on('set_username', ({ username }) => {
+    socket.data.username = username.trim().slice(0, 20) || 'Player';
+    console.log(`${socket.id} → username: ${socket.data.username}`);
   });
 
-  socket.on('join_room', ({ roomCode, playerName }) => {
-    const code = roomCode.toUpperCase();
-    const room = rooms[code];
+  socket.on('join_queue', ({ gameType }) => {
+    const username = socket.data.username;
+    if (!username) {
+      socket.emit('error', { message: 'Set a username first.' });
+      return;
+    }
 
-    if (!room) { socket.emit('error', { message: 'Room not found.' }); return; }
-    if (Object.keys(room.players).length >= 2) { socket.emit('error', { message: 'Room is full.' }); return; }
-    if (room.started) { socket.emit('error', { message: 'Race already in progress.' }); return; }
+    // Remove from any existing queue first
+    removeFromAllQueues(socket.id);
 
-    room.players[socket.id] = freshPlayer(socket.id, playerName || 'Player 2');
-    socket.join(code);
-    socket.data.roomCode = code;
+    queues[gameType].push({ socketId: socket.id, username, gameType });
+    console.log(`Queue [${gameType}]: ${queues[gameType].map(p => p.username).join(', ')}`);
 
-    io.to(code).emit('room_joined', { room: getPublicRoom(room), playerId: socket.id });
+    tryMatch(gameType);
+  });
 
-    if (Object.keys(room.players).length === 2) {
-      startCountdown(code);
+  socket.on('leave_queue', () => {
+    removeFromAllQueues(socket.id);
+  });
+
+  // ── Typing Race ─────────────────────────────────────────────────────────────
+
+  socket.on('typing_progress', ({ wpm, finished }) => {
+    const { matchId } = socket.data;
+    if (!matchId) return;
+    const match = matches[matchId];
+    if (!match || match.ended || !match.players[socket.id]) return;
+
+    match.players[socket.id].score    = wpm;
+    match.players[socket.id].finished = finished;
+
+    io.to(matchId).emit('typing_update', { players: Object.values(match.players) });
+
+    if (Object.values(match.players).every((p) => p.finished)) {
+      endTypingGame(matchId);
     }
   });
 
-  socket.on('progress_update', ({ progress, wpm, accuracy, finished }) => {
-    const code = socket.data.roomCode;
-    if (!code) return;
-    const room = rooms[code];
-    if (!room || !room.players[socket.id] || room.ended) return;
+  // ── Trivia ──────────────────────────────────────────────────────────────────
 
-    const player = room.players[socket.id];
-    player.progress = progress;
-    player.wpm = wpm;
-    player.accuracy = accuracy ?? player.accuracy;
+  socket.on('trivia_answer', ({ questionIndex, answer }) => {
+    const { matchId } = socket.data;
+    if (!matchId) return;
+    const match = matches[matchId];
+    if (!match || match.ended || !match.players[socket.id]) return;
 
-    if (finished && !player.finished) {
+    // Ignore duplicate answers for the same question
+    const answered = triviaAnswered[matchId]?.[questionIndex];
+    if (!answered || answered.has(socket.id)) return;
+    answered.add(socket.id);
+
+    const q       = match.gameData.questions[questionIndex];
+    const correct = answer === q.correct;
+    if (correct) match.players[socket.id].score++;
+
+    io.to(matchId).emit('trivia_answer_result', { playerId: socket.id, correct });
+    io.to(matchId).emit('trivia_scores', { players: Object.values(match.players) });
+
+    // Advance question once both players have answered
+    const totalPlayers = Object.keys(match.players).length;
+    if (answered.size >= totalPlayers) {
+      match.gameData.currentQuestion++;
+      setTimeout(() => sendNextTriviaQuestion(matchId), 1500);
+    }
+  });
+
+  // ── Math Sprint ─────────────────────────────────────────────────────────────
+
+  socket.on('math_answer', ({ problemIndex, answer }) => {
+    const { matchId } = socket.data;
+    if (!matchId) return;
+    const match = matches[matchId];
+    if (!match || match.ended || !match.players[socket.id]) return;
+
+    const player = match.players[socket.id] as any;
+
+    // Only accept answer for the player's current problem
+    if (problemIndex !== player.problemIndex) return;
+
+    const prob = match.gameData.problems[problemIndex];
+    if (answer !== prob.answer) return; // wrong — client keeps trying
+
+    player.score++;
+    player.problemIndex++;
+
+    io.to(matchId).emit('math_correct', { playerId: socket.id, problemIndex });
+    io.to(matchId).emit('math_scores',  { players: Object.values(match.players) });
+
+    if (player.score >= 20) {
+      endMathGame(matchId, socket.id);
+      return;
+    }
+
+    // Send next problem only to this player
+    const nextProb = match.gameData.problems[player.problemIndex];
+    if (nextProb) {
+      socket.emit('math_problem', { problemIndex: player.problemIndex, problem: nextProb.problem });
+    }
+  });
+
+  // ── Minesweeper ─────────────────────────────────────────────────────────────
+
+  socket.on('minesweeper_reveal', ({ row, col }) => {
+    const { matchId } = socket.data;
+    if (!matchId) return;
+    const match = matches[matchId];
+    if (!match || match.ended || !match.players[socket.id]) return;
+
+    const hitMine  = match.gameData.board[row][col] as boolean;
+    const player   = match.players[socket.id];
+    const totalSafe = (match.gameData.size ** 2) - match.gameData.mineCount;
+
+    if (hitMine) {
       player.finished = true;
-      player.finishTime = Date.now();
-    }
-
-    io.to(code).emit('room_update', { players: Object.values(room.players) });
-
-    const allFinished = Object.values(room.players).every((p) => p.finished);
-    if (allFinished) endRound(code);
-  });
-
-  socket.on('rematch_vote', () => {
-    const code = socket.data.roomCode;
-    if (!code) return;
-    const room = rooms[code];
-    if (!room) return;
-
-    room.rematchVotes.add(socket.id);
-    io.to(code).emit('rematch_votes', {
-      count: room.rematchVotes.size,
-      total: Object.keys(room.players).length,
-    });
-
-    if (room.rematchVotes.size === Object.keys(room.players).length) {
-      room.paragraph = randomParagraph();
-      room.started = false;
-      room.ended = false;
-      room.startTime = null;
-      room.rematchVotes = new Set();
-      if (room.roundTimer) { clearInterval(room.roundTimer); room.roundTimer = null; }
-      Object.values(room.players).forEach((p) => {
-        p.progress = 0; p.wpm = 0; p.accuracy = 100; p.finished = false; p.finishTime = null;
+      io.to(matchId).emit('minesweeper_update', {
+        playerId: socket.id, revealedCount: player.score, hitMine: true,
       });
 
-      io.to(code).emit('rematch_start', { room: getPublicRoom(room) });
-      startCountdown(code);
+      if (!match.ended) {
+        match.ended = true;
+        const other = Object.values(match.players).find((p) => p.id !== socket.id);
+        if (other) {
+          io.to(matchId).emit('game_over', {
+            winnerId: other.id, winnerName: other.username, players: Object.values(match.players),
+          });
+        }
+      }
+    } else {
+      player.score++;
+      io.to(matchId).emit('minesweeper_update', {
+        playerId: socket.id, revealedCount: player.score, hitMine: false,
+      });
+      io.to(matchId).emit('minesweeper_progress', { players: Object.values(match.players) });
+
+      if (player.score >= totalSafe && !match.ended) {
+        match.ended = true;
+        io.to(matchId).emit('game_over', {
+          winnerId: socket.id, winnerName: player.username, players: Object.values(match.players),
+        });
+      }
     }
   });
 
+  // ── Disconnect ──────────────────────────────────────────────────────────────
+
   socket.on('disconnect', () => {
-    const code = socket.data.roomCode;
-    if (!code || !rooms[code]) return;
+    removeFromAllQueues(socket.id);
 
-    const room = rooms[code];
-    delete room.players[socket.id];
-
-    if (Object.keys(room.players).length === 0) {
-      if (room.roundTimer) clearInterval(room.roundTimer);
-      delete rooms[code];
-      console.log(`Room ${code} deleted`);
-    } else {
-      io.to(code).emit('player_left', { playerId: socket.id });
-      io.to(code).emit('room_update', { players: Object.values(room.players) });
+    const { matchId } = socket.data;
+    if (matchId && matches[matchId] && !matches[matchId].ended) {
+      matches[matchId].ended = true;
+      io.to(matchId).emit('opponent_disconnected');
+      delete matches[matchId];
+      delete triviaAnswered[matchId];
     }
+
     console.log('disconnected:', socket.id);
   });
 });
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001;
-httpServer.listen(PORT, '0.0.0.0', () => console.log(`Server running on http://localhost:${PORT}`));
+httpServer.listen(PORT, '0.0.0.0', () =>
+  console.log(`🎮 Game server running on http://localhost:${PORT}`)
+);

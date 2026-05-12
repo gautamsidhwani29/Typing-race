@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -5,18 +7,20 @@
 }
 
 :root {
-  --bg: #0f1117;
-  --surface: #1a1d27;
-  --surface2: #22263a;
-  --border: #2e3250;
-  --accent: #6c63ff;
-  --accent-glow: rgba(108, 99, 255, 0.35);
-  --green: #4ade80;
-  --red: #f87171;
-  --yellow: #facc15;
-  --text: #e2e8f0;
-  --muted: #64748b;
-  --white: #ffffff;
+  --bg:        #0f0f0f;
+  --surface:   #1a1a1a;
+  --surface2:  #242424;
+  --border:    #2e2e2e;
+  --accent:    #e2b714;
+  --accent-dim: rgba(226, 183, 20, 0.15);
+  --accent-glow: rgba(226, 183, 20, 0.35);
+  --green:     #4ade80;
+  --red:       #f87171;
+  --blue:      #60a5fa;
+  --text:      #d1d0c5;
+  --text-dim:  #646669;
+  --white:     #ffffff;
+  --mono:      'JetBrains Mono', monospace;
 }
 
 html, body, #root {
@@ -28,6 +32,7 @@ body {
   color: var(--text);
   font-family: 'Inter', sans-serif;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
 button {
@@ -37,4 +42,15 @@ button {
 
 input {
   font-family: 'Inter', sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
 }

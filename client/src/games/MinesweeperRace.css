@@ -1,0 +1,125 @@
+.minesweeper {
+  width: 100%;
+  max-width: 700px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.minesweeper__info {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+}
+
+.minesweeper__board {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
+  align-self: center;
+}
+
+.minesweeper__row {
+  display: flex;
+  gap: 3px;
+}
+
+.minesweeper__cell {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  border: none;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s;
+  cursor: pointer;
+}
+
+.minesweeper__cell--hidden {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+
+.minesweeper__cell--hidden:hover:not(:disabled) {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+
+.minesweeper__cell--revealed {
+  background: var(--bg);
+  border: 1px solid transparent;
+  cursor: default;
+}
+
+.minesweeper__cell--flagged {
+  background: rgba(248,113,113,0.1);
+  border: 1px solid rgba(248,113,113,0.3);
+}
+
+.minesweeper__cell--mine {
+  background: rgba(248,113,113,0.2);
+  border: 1px solid var(--red);
+}
+
+.minesweeper__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.minesweeper__progress-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.minesweeper__progress-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 80px;
+}
+
+.minesweeper__progress-track {
+  flex: 1;
+  height: 10px;
+  background: var(--surface2);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.minesweeper__progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.3s ease-out;
+}
+
+.minesweeper__progress-fill--you {
+  background: linear-gradient(90deg, var(--accent), #f0d060);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.minesweeper__progress-fill--opp {
+  background: linear-gradient(90deg, var(--blue), #93c5fd);
+}
+
+.minesweeper__progress-pct {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  min-width: 36px;
+  text-align: right;
+}
+
+.minesweeper__hint {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-dim);
+}

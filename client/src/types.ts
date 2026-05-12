@@ -1,42 +1,72 @@
-// ── Shared domain types ───────────────────────────────────────────────────────
+export type GameType = 'typing' | 'trivia' | 'math' | 'minesweeper';
 
-export interface Player {
+export type AppPhase =
+  | 'username'
+  | 'lobby'
+  | 'finding'
+  | 'countdown'
+  | 'playing'
+  | 'gameover';
+
+export interface GamePlayer {
   id: string;
-  name: string;
-  progress: number;
-  wpm: number;
-  accuracy: number;
+  username: string;
+  score: number;
   finished: boolean;
-  finishTime: number | null;
 }
 
-export interface PublicRoom {
-  code: string;
+export interface GameOverResult {
+  winnerId: string;
+  winnerName: string;
+  players: GamePlayer[];
+}
+
+export interface QueueCounts {
+  typing: number;
+  trivia: number;
+  math: number;
+  minesweeper: number;
+}
+
+// Typing Race
+export interface TypingGameData {
   paragraph: string;
-  started: boolean;
-  players: Player[];
+  duration: number;
 }
 
-export type WinReason = 'wpm' | 'accuracy' | 'draw';
-
-export interface RaceResult {
-  winnerId: string | null;
-  winnerName: string | null;
-  reason: WinReason;
-  isDraw: boolean;
-  players: Player[];
-}
-
-export interface RematchVotes {
-  count: number;
-  total: number;
-}
-
-export type Phase = 'lobby' | 'waiting' | 'countdown' | 'racing' | 'finished';
-
-export interface ProgressUpdate {
+export interface TypingProgressUpdate {
   progress: number;
   wpm: number;
   accuracy: number;
   finished: boolean;
+}
+
+// Trivia
+export interface TriviaGameData {
+  questions: TriviaQuestion[];
+  currentQuestion: number;
+}
+
+export interface TriviaQuestion {
+  question: string;
+  correct: string;
+  options: string[];
+}
+
+// Math
+export interface MathGameData {
+  problems: MathProblem[];
+  currentProblem: number;
+}
+
+export interface MathProblem {
+  problem: string;
+  answer: number;
+}
+
+// Minesweeper
+export interface MinesweeperGameData {
+  board: boolean[][];
+  size: number;
+  mineCount: number;
 }

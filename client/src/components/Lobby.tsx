@@ -1,99 +1,86 @@
-import React, { useState } from 'react';
+import { GameType, QueueCounts } from '../types';
 import './Lobby.css';
 
-interface LobbyProps {
-  onCreate: (name: string) => void;
-  onJoin: (name: string, code: string) => void;
-  error: string;
+interface Props {
+  username: string;
+  queueCounts: QueueCounts;
+  onPlay: (gameType: GameType) => void;
 }
 
-type Tab = 'create' | 'join';
+const GAMES: {
+  type: GameType;
+  emoji: string;
+  name: string;
+  description: string;
+  color: string;
+}[] = [
+  {
+    type: 'typing',
+    emoji: '⌨️',
+    name: 'Typing Race',
+    description: 'Race to type a paragraph faster than your opponent',
+    color: '#e2b714',
+  },
+  {
+    type: 'trivia',
+    emoji: '🧠',
+    name: 'Trivia Battle',
+    description: 'Answer 10 trivia questions — fastest correct answer wins each round',
+    color: '#60a5fa',
+  },
+  {
+    type: 'math',
+    emoji: '🔢',
+    name: 'Math Sprint',
+    description: 'Solve 20 math problems before your opponent does',
+    color: '#4ade80',
+  },
+  {
+    type: 'minesweeper',
+    emoji: '💣',
+    name: 'Minesweeper Race',
+    description: 'Clear the board without hitting a mine — same board, first to finish wins',
+    color: '#f87171',
+  },
+];
 
-export default function Lobby({ onCreate, onJoin, error }: LobbyProps) {
-  const [name, setName] = useState<string>('');
-  const [joinCode, setJoinCode] = useState<string>('');
-  const [tab, setTab] = useState<Tab>('create');
-
-  const handleCreate = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-    onCreate(name.trim());
-  };
-
-  const handleJoin = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    if (!name.trim() || !joinCode.trim()) return;
-    onJoin(name.trim(), joinCode.trim());
-  };
-
+export default function Lobby({ username, queueCounts, onPlay }: Props) {
   return (
     <div className="lobby">
-      <div className="lobby__hero">
-        <div className="lobby__logo">⌨️</div>
-        <h1 className="lobby__title">TypeRace</h1>
-        <p className="lobby__subtitle">1v1 real-time typing battle</p>
-      </div>
-
-      <div className="lobby__card">
-        <div className="lobby__tabs">
-          <button
-            className={`lobby__tab ${tab === 'create' ? 'active' : ''}`}
-            onClick={() => setTab('create')}
-          >
-            Create Room
-          </button>
-          <button
-            className={`lobby__tab ${tab === 'join' ? 'active' : ''}`}
-            onClick={() => setTab('join')}
-          >
-            Join Room
-          </button>
+      <header className="lobby__header">
+        <h1 className="lobby__title">Game Arena</h1>
+        <div className="lobby__user">
+          <span className="lobby__user-dot" />
+          <span className="lobby__username">{username}</span>
         </div>
+      </header>
 
-        <div className="lobby__form-wrap">
-          <div className="lobby__field">
-            <label className="lobby__label">Your Name</label>
-            <input
-              className="lobby__input"
-              type="text"
-              placeholder="Enter your name..."
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={20}
-              autoFocus
-            />
-          </div>
+      <p className="lobby__subtitle">Choose a game and get matched instantly</p>
 
-          {tab === 'join' && (
-            <div className="lobby__field">
-              <label className="lobby__label">Room Code</label>
-              <input
-                className="lobby__input lobby__input--code"
-                type="text"
-                placeholder="e.g. AB3XY"
-                value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                maxLength={5}
-              />
+      <div className="lobby__grid">
+        {GAMES.map((game) => (
+          <div
+            key={game.type}
+            className="game-card"
+            style={{ '--card-color': game.color } as React.CSSProperties}
+          >
+            <div className="game-card__emoji">{game.emoji}</div>
+            <h2 className="game-card__name">{game.name}</h2>
+            <p className="game-card__desc">{game.description}</p>
+            <div className="game-card__footer">
+              <div className="game-card__waiting">
+                <span className="game-card__waiting-dot" />
+                <span>{queueCounts[game.type]} waiting</span>
+              </div>
+              <button
+                className="game-card__btn"
+                onClick={() => onPlay(game.type)}
+              >
+                Play
+              </button>
             </div>
-          )}
-
-          {error && <p className="lobby__error">{error}</p>}
-
-          {tab === 'create' ? (
-            <button className="lobby__btn" onClick={handleCreate} disabled={!name.trim()}>
-              Create Room
-            </button>
-          ) : (
-            <button
-              className="lobby__btn"
-              onClick={handleJoin}
-              disabled={!name.trim() || !joinCode.trim()}
-            >
-              Join Room
-            </button>
-          )}
-        </div>
+          </div>
+        ))}
       </div>
     </div>
   );

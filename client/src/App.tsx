@@ -1,170 +1,214 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { io, Socket } from "socket.io-client";
-import Lobby from "./components/Lobby";
-import WaitingRoom from "./components/WaitingRoom";
-import Race from "./components/Race";
-import WinnerScreen from "./components/WinnerScreen";
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { io, Socket } from 'socket.io-client';
+import UsernameScreen from './components/UsernameScreen';
+import Lobby from './components/Lobby';
+import FindingMatch from './components/FindingMatch';
+import CountdownOverlay from './components/CountdownOverlay';
+import GameOver from './components/GameOver';
+import TypingRace from './games/TypingRace';
+import TriviaBattle from './games/TriviaBattle';
+import MathSprint from './games/MathSprint';
+import MinesweeperRace from './games/MinesweeperRace';
 import {
-  Phase,
-  Player,
-  PublicRoom,
-  RaceResult,
-  RematchVotes,
-  ProgressUpdate,
-} from "./types";
-import "./App.css";
+  AppPhase, GameType, QueueCounts, GameOverResult,
+  TypingGameData, TriviaGameData, MathGameData, MinesweeperGameData,
+} from './types';
+import './App.css';
 
-const SOCKET_URL = "http://192.168.1.252:3001";
+const SOCKET_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
 
 export default function App() {
   const socketRef = useRef<Socket | null>(null);
-  const [phase, setPhase] = useState<Phase>("lobby");
-  const [playerId, setPlayerId] = useState<string | null>(null);
-  const [room, setRoom] = useState<PublicRoom | null>(null);
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [paragraph, setParagraph] = useState<string>("");
-  const [countdown, setCountdown] = useState<number | null>(null);
-  const [raceResult, setRaceResult] = useState<RaceResult | null>(null);
-  const [rematchVotes, setRematchVotes] = useState<RematchVotes>({
-    count: 0,
-    total: 2,
-  });
-  const [hasVoted, setHasVoted] = useState<boolean>(false);
-  const [error, setError] = useState<string>("");
-  const [timeRemaining, setTimeRemaining] = useState<number>(30);
-  const [roundDuration, setRoundDuration] = useState<number>(30);
 
+  // ── State ──────────────────────────────────────────────────────────────────
+  const [phase, setPhase] = useState<AppPhase>('username');
+  const [username, setUsername] = useState('');
+  const [queueCounts, setQueueCounts] = useState<QueueCounts>({ typing: 0, trivia: 0, math: 0, minesweeper: 0 });
+  const [selectedGame, setSelectedGame] = useState<GameType | null>(null);
+  const [matchId, setMatchId] = useState('');
+  const [opponent, setOpponent] = useState('');
+  const [countdown, setCountdown] = useState(3);
+  const [gameData, setGameData] = useState<any>(null);
+  const [gameResult, setGameResult] = useState<GameOverResult | null>(null);
+  const [myId, setMyId] = useState('');
+
+  // ── Socket — created once, never recreated ─────────────────────────────────
   useEffect(() => {
-    const socket: Socket = io(SOCKET_URL); 
+    const socket: Socket = io(SOCKET_URL, { transports: ['websocket'] });
     socketRef.current = socket;
 
-    socket.on(
-      "room_joined",
-      ({ room: r, playerId: pid }: { room: PublicRoom; playerId: string }) => {
-        setRoom(r);
-        setPlayers(r.players);
-        setParagraph(r.paragraph);
-        setPlayerId((prev) => prev ?? pid);
-        setError("");
-        setPhase("waiting");
-      },
-    );
+    // socket.id is available after 'connect'
+    socket.on('connect', () => {
+      setMyId(socket.id ?? '');
+    });
 
-    socket.on("countdown", ({ count }: { count: number }) => {
+    socket.on('queue_counts', (counts: QueueCounts) => {
+      setQueueCounts(counts);
+    });
+
+    socket.on('match_found', ({ matchId: mid, gameType, opponent: opp }: {
+      matchId: string; gameType: GameType; opponent: string;
+    }) => {
+      setMatchId(mid);
+      setSelectedGame(gameType);
+      setOpponent(opp);
+      // Don't set phase here — wait for the first countdown tick
+      // so the countdown value is already set before we render the overlay
+    });
+
+    socket.on('countdown', ({ count }: { count: number }) => {
       setCountdown(count);
-      setPhase("countdown");
+      // Transition to countdown phase on first tick (count === 3)
+      setPhase((prev) => (prev === 'finding' || prev === 'countdown') ? 'countdown' : prev);
     });
 
-    socket.on(
-      "race_start",
-      ({
-        paragraph: p,
-        duration,
-      }: {
-        paragraph: string;
-        startTime: number;
-        duration: number;
-      }) => {
-        setParagraph(p);
-        setCountdown(null);
-        setRoundDuration(duration);
-        setTimeRemaining(duration);
-        setPhase("racing");
-      },
-    );
-
-    socket.on("timer_tick", ({ remaining }: { remaining: number }) => {
-      setTimeRemaining(remaining);
+    socket.on('game_start', ({ gameData: gd }: { gameData: any }) => {
+      setGameData(gd);
+      setPhase('playing');
     });
 
-    socket.on("room_update", ({ players: ps }: { players: Player[] }) => {
-      setPlayers(ps);
+    socket.on('game_over', (result: GameOverResult) => {
+      setGameResult(result);
+      setPhase('gameover');
     });
 
-    socket.on("race_over", (result: RaceResult) => {
-      setRaceResult(result);
-      setPlayers(result.players);
-      setPhase("finished");
-    });
-
-    socket.on("rematch_votes", (votes: RematchVotes) => {
-      setRematchVotes(votes);
-    });
-
-    socket.on("rematch_start", ({ room: r }: { room: PublicRoom }) => {
-      setRoom(r);
-      setPlayers(r.players);
-      setParagraph(r.paragraph);
-      setRaceResult(null);
-      setRematchVotes({ count: 0, total: 2 });
-      setHasVoted(false);
-      setPhase("waiting");
-    });
-
-    socket.on("player_left", () => {
-      setError("Your opponent left the room.");
-      setPhase("lobby");
-      setRoom(null);
-      setPlayers([]);
-    });
-
-    socket.on("error", ({ message }: { message: string }) => {
-      setError(message);
+    socket.on('opponent_disconnected', () => {
+      // Use functional update so we always have the latest socket.id
+      setMyId((id) => {
+        setGameResult({
+          winnerId: id,
+          winnerName: '',   // filled below
+          players: [],
+        });
+        return id;
+      });
+      setUsername((name) => {
+        setGameResult((prev) => prev ? { ...prev, winnerName: name } : prev);
+        return name;
+      });
+      setPhase('gameover');
     });
 
     return () => {
       socket.disconnect();
     };
+  }, []); // ← empty deps: socket is created exactly once
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
+
+  const handleUsernameSubmit = useCallback((name: string) => {
+    setUsername(name);
+    // Emit on the already-connected socket
+    socketRef.current?.emit('set_username', { username: name });
+    setPhase('lobby');
   }, []);
 
-  const handleCreate = useCallback((name: string) => {
-    setError("");
-    socketRef.current?.emit("create_room", { playerName: name });
+  const handlePlayGame = useCallback((gameType: GameType) => {
+    setSelectedGame(gameType);
+    setCountdown(3); // reset so overlay doesn't flash stale number
+    socketRef.current?.emit('join_queue', { gameType });
+    setPhase('finding');
   }, []);
 
-  const handleJoin = useCallback((name: string, code: string) => {
-    setError("");
-    socketRef.current?.emit("join_room", { playerName: name, roomCode: code });
+  const handleCancelSearch = useCallback(() => {
+    socketRef.current?.emit('leave_queue');
+    setSelectedGame(null);
+    setPhase('lobby');
   }, []);
 
-  const handleProgressUpdate = useCallback((data: ProgressUpdate) => {
-    socketRef.current?.emit("progress_update", data);
+  const handlePlayAgain = useCallback(() => {
+    setGameResult(null);
+    setGameData(null);
+    setMatchId('');
+    setOpponent('');
+    setCountdown(3);
+    setPhase('lobby');
   }, []);
 
-  const handleRematch = useCallback(() => {
-    socketRef.current?.emit("rematch_vote");
-    setHasVoted(true);
-  }, []);
+  const socket = socketRef.current;
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="app">
-      {phase === "lobby" && (
-        <Lobby onCreate={handleCreate} onJoin={handleJoin} error={error} />
+      {phase === 'username' && (
+        <UsernameScreen onSubmit={handleUsernameSubmit} />
       )}
-      {phase === "waiting" && (
-        <WaitingRoom room={room} players={players} playerId={playerId} />
-      )}
-      {(phase === "countdown" || phase === "racing") && (
-        <Race
-          paragraph={paragraph}
-          players={players}
-          playerId={playerId}
-          countdown={countdown}
-          phase={phase}
-          onProgressUpdate={handleProgressUpdate}
-          room={room}
-          timeRemaining={timeRemaining}
-          roundDuration={roundDuration}
+
+      {phase === 'lobby' && (
+        <Lobby
+          username={username}
+          queueCounts={queueCounts}
+          onPlay={handlePlayGame}
         />
       )}
-      {phase === "finished" && (
-        <WinnerScreen
-          result={raceResult}
-          playerId={playerId}
-          rematchVotes={rematchVotes}
-          hasVoted={hasVoted}
-          onRematch={handleRematch}
-          room={room}
+
+      {phase === 'finding' && selectedGame && (
+        <FindingMatch
+          gameType={selectedGame}
+          onCancel={handleCancelSearch}
+        />
+      )}
+
+      {phase === 'countdown' && selectedGame && (
+        <CountdownOverlay
+          count={countdown}
+          gameType={selectedGame}
+          opponent={opponent}
+        />
+      )}
+
+      {phase === 'playing' && selectedGame && socket && gameData && (
+        <>
+          {selectedGame === 'typing' && (
+            <TypingRace
+              socket={socket}
+              matchId={matchId}
+              myId={myId}
+              username={username}
+              opponent={opponent}
+              gameData={gameData as TypingGameData}
+            />
+          )}
+          {selectedGame === 'trivia' && (
+            <TriviaBattle
+              socket={socket}
+              matchId={matchId}
+              myId={myId}
+              username={username}
+              opponent={opponent}
+              gameData={gameData as TriviaGameData}
+            />
+          )}
+          {selectedGame === 'math' && (
+            <MathSprint
+              socket={socket}
+              matchId={matchId}
+              myId={myId}
+              username={username}
+              opponent={opponent}
+              gameData={gameData as MathGameData}
+            />
+          )}
+          {selectedGame === 'minesweeper' && (
+            <MinesweeperRace
+              socket={socket}
+              matchId={matchId}
+              myId={myId}
+              username={username}
+              opponent={opponent}
+              gameData={gameData as MinesweeperGameData}
+            />
+          )}
+        </>
+      )}
+
+      {phase === 'gameover' && gameResult && (
+        <GameOver
+          result={gameResult}
+          myId={myId}
+          username={username}
+          gameType={selectedGame}
+          onPlayAgain={handlePlayAgain}
         />
       )}
     </div>

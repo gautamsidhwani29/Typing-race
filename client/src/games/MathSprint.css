@@ -1,0 +1,102 @@
+.math {
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.math__card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 48px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+}
+
+.math__problem {
+  font-size: 56px;
+  font-weight: 800;
+  color: var(--text);
+  font-family: var(--mono);
+  text-align: center;
+  letter-spacing: -2px;
+}
+
+.math__form {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.math__input {
+  flex: 1;
+  background: var(--surface2);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+  color: var(--text);
+  font-size: 20px;
+  font-family: var(--mono);
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.math__input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* hide number input arrows */
+.math__input::-webkit-outer-spin-button,
+.math__input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.math__input[type=number] { -moz-appearance: textfield; }
+
+.math__btn {
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 10px;
+  padding: 14px 24px;
+  font-size: 16px;
+  font-weight: 700;
+  transition: all 0.2s;
+}
+
+.math__btn:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.math__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.math__progress-bar {
+  height: 10px;
+  background: var(--surface2);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.math__progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.3s ease-out;
+}
+
+.math__progress-fill--you {
+  background: linear-gradient(90deg, var(--accent), #f0d060);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.math__progress-fill--opp {
+  background: linear-gradient(90deg, var(--blue), #93c5fd);
+}

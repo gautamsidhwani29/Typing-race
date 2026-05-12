@@ -1,7 +1,7 @@
 {
   "name": "typing-race-server",
-  "version": "1.0.0",
-  "description": "1v1 real-time typing race backend",
+  "version": "2.0.0",
+  "description": "Multi-game platform backend",
   "main": "dist/server.js",
   "scripts": {
     "start": "node dist/server.js",
@@ -9,6 +9,7 @@
     "build": "tsc"
   },
   "dependencies": {
+    "axios": "^1.16.0",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "socket.io": "^4.7.2"
