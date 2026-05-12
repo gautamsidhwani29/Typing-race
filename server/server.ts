@@ -36,9 +36,16 @@ interface ClientToServerEvents {
   leave_queue:        () => void;
   typing_progress:    (data: { progress: number; wpm: number; accuracy: number; finished: boolean }) => void;
   trivia_answer:      (data: { questionIndex: number; answer: string }) => void;
-  math_answer:        (data: { problemIndex: number; answer: number }) => void;
+  math_answer:        (data: { questionIndex: number; answer: number }) => void;
   minesweeper_reveal: (data: { row: number; col: number }) => void;
   minesweeper_flag:   (data: { row: number; col: number }) => void;
+}
+
+interface MathQuestionResult {
+  questionIndex: number;
+  winnerId: string | null;   // null = tie or both wrong
+  scores: Record<string, number>; // socketId → points earned this question
+  correctIds: string[];           // who answered correctly
 }
 
 interface ServerToClientEvents {
@@ -52,9 +59,10 @@ interface ServerToClientEvents {
   trivia_question:       (data: { questionIndex: number; question: string; options: string[]; timeLimit: number }) => void;
   trivia_answer_result:  (data: { playerId: string; correct: boolean }) => void;
   trivia_scores:         (data: { players: MatchPlayer[] }) => void;
-  math_problem:          (data: { problemIndex: number; problem: string }) => void;
-  math_correct:          (data: { playerId: string; problemIndex: number }) => void;
-  math_scores:           (data: { players: MatchPlayer[] }) => void;
+  // Math — all 5 questions sent at once; server resolves each after both answer or timeout
+  math_problem:          (data: { problemIndex: number; problem: string; timeLimit: number }) => void;
+  math_question_result:  (data: MathQuestionResult & { players: MatchPlayer[] }) => void;
+  math_time_up:          (data: { questionIndex: number; players: MatchPlayer[] }) => void;
   minesweeper_update:    (data: { playerId: string; revealedCount: number; hitMine: boolean }) => void;
   minesweeper_progress:  (data: { players: MatchPlayer[] }) => void;
   game_over:             (data: { winnerId: string; winnerName: string; players: MatchPlayer[] }) => void;
@@ -143,9 +151,12 @@ async function generateTriviaData() {
   }
 }
 
+const MATH_QUESTION_COUNT = 5;
+const MATH_TIME_PER_Q    = 15; // seconds per question
+
 function generateMathData() {
-  const problems: { problem: string; answer: number }[] = [];
-  for (let i = 0; i < 20; i++) {
+  const questions: { problem: string; answer: number }[] = [];
+  for (let i = 0; i < MATH_QUESTION_COUNT; i++) {
     const op = ['+', '-', '*'][Math.floor(Math.random() * 3)];
     let problem: string, answer: number;
     if (op === '*') {
@@ -160,13 +171,13 @@ function generateMathData() {
       answer  = a + b;
     } else {
       const a = Math.floor(Math.random() * 99) + 1;
-      const b = Math.floor(Math.random() * a) + 1; // ensure non-negative result
+      const b = Math.floor(Math.random() * a) + 1;
       problem = `${a} - ${b}`;
       answer  = a - b;
     }
-    problems.push({ problem, answer });
+    questions.push({ problem, answer });
   }
-  return { problems, currentProblem: 0 };
+  return { questions, timePerQuestion: MATH_TIME_PER_Q };
 }
 
 function generateMinesweeperData() {
@@ -359,36 +370,171 @@ function endTriviaGame(matchId: string) {
   io.to(matchId).emit('game_over', { winnerId: winner.id, winnerName: winner.username, players });
 }
 
+// Per-match math state
+interface MathMatchState {
+  currentQuestion: number;
+  questionStartTime: number;
+  // socketId → { answeredAt, correct }
+  answers: Record<string, { answeredAt: number; correct: boolean } | null>;
+  questionTimer: ReturnType<typeof setTimeout> | null;
+  // per-player correct count (separate from score which is points)
+  correctCount: Record<string, number>;
+}
+const mathState: Record<string, MathMatchState> = {};
+
 function startMathGame(matchId: string) {
-  // Each player gets their own problem pointer — send the first problem
   const match = matches[matchId];
   if (!match) return;
 
-  // Give each player their own progress counter
-  for (const p of Object.values(match.players)) {
-    (p as any).problemIndex = 0;
+  const playerIds = Object.keys(match.players);
+  mathState[matchId] = {
+    currentQuestion:   0,
+    questionStartTime: Date.now(),
+    answers:           Object.fromEntries(playerIds.map((id) => [id, null])),
+    questionTimer:     null,
+    correctCount:      Object.fromEntries(playerIds.map((id) => [id, 0])),
+  };
+
+  sendMathQuestion(matchId);
+}
+
+function sendMathQuestion(matchId: string) {
+  const match = matches[matchId];
+  const state = mathState[matchId];
+  if (!match || !state || match.ended) return;
+
+  const { questions, timePerQuestion } = match.gameData;
+  const qi = state.currentQuestion;
+
+  if (qi >= questions.length) {
+    endMathGame(matchId);
+    return;
   }
 
-  // Send first problem to each player individually
-  for (const [sid] of Object.entries(match.players)) {
-    const s = io.sockets.sockets.get(sid);
-    if (s) {
-      const prob = match.gameData.problems[0];
-      s.emit('math_problem', { problemIndex: 0, problem: prob.problem });
+  // Reset answers for this question
+  for (const id of Object.keys(state.answers)) state.answers[id] = null;
+  state.questionStartTime = Date.now();
+
+  // Broadcast the question to both players
+  io.to(matchId).emit('math_problem', {
+    problemIndex: qi,
+    problem:      questions[qi].problem,
+    timeLimit:    timePerQuestion,
+  });
+
+  // Auto-resolve after time limit
+  state.questionTimer = setTimeout(() => {
+    resolveMathQuestion(matchId, true);
+  }, timePerQuestion * 1000);
+}
+
+function resolveMathQuestion(matchId: string, timedOut: boolean) {
+  const match = matches[matchId];
+  const state = mathState[matchId];
+  if (!match || !state || match.ended) return;
+
+  if (state.questionTimer) {
+    clearTimeout(state.questionTimer);
+    state.questionTimer = null;
+  }
+
+  const qi      = state.currentQuestion;
+  const answers = state.answers;
+  const players = Object.values(match.players);
+
+  // Determine points for this question
+  // Fastest correct → 2pts, slower correct → 1pt, wrong/no answer → 0pt
+  const correct = players.filter((p) => answers[p.id]?.correct);
+
+  const questionScores: Record<string, number> = {};
+  for (const p of players) questionScores[p.id] = 0;
+
+  if (correct.length === 2) {
+    // Both correct — faster gets 2, slower gets 1
+    const [faster, slower] = correct.sort(
+      (a, b) => answers[a.id]!.answeredAt - answers[b.id]!.answeredAt
+    );
+    const timeDiff = answers[slower.id]!.answeredAt - answers[faster.id]!.answeredAt;
+    if (timeDiff < 50) {
+      // Essentially simultaneous — both get 1pt
+      questionScores[faster.id] = 1;
+      questionScores[slower.id] = 1;
+    } else {
+      questionScores[faster.id] = 2;
+      questionScores[slower.id] = 1;
     }
+  } else if (correct.length === 1) {
+    questionScores[correct[0].id] = 2;
+  }
+  // wrong.length === 2 → both get 0
+
+  // Apply scores and correct counts
+  for (const p of players) {
+    match.players[p.id].score += questionScores[p.id];
+    if (answers[p.id]?.correct) state.correctCount[p.id]++;
+  }
+
+  const winnerId = correct.length === 1
+    ? correct[0].id
+    : correct.length === 2
+      ? (questionScores[correct[0].id] > questionScores[correct[1].id]
+          ? correct[0].id
+          : questionScores[correct[1].id] > questionScores[correct[0].id]
+            ? correct[1].id
+            : null)
+      : null;
+
+  const resultPayload = {
+    questionIndex: qi,
+    winnerId,
+    scores:     questionScores,
+    correctIds: correct.map((p) => p.id),
+    players:    Object.values(match.players),
+  };
+
+  if (timedOut) {
+    io.to(matchId).emit('math_time_up', { questionIndex: qi, players: Object.values(match.players) });
+  }
+  io.to(matchId).emit('math_question_result', resultPayload);
+
+  // Advance to next question after a short pause
+  state.currentQuestion++;
+  if (state.currentQuestion < match.gameData.questions.length) {
+    setTimeout(() => sendMathQuestion(matchId), 2000);
+  } else {
+    setTimeout(() => endMathGame(matchId), 2000);
   }
 }
 
-function endMathGame(matchId: string, winnerId: string) {
+function endMathGame(matchId: string) {
   const match = matches[matchId];
+  const state = mathState[matchId];
   if (!match || match.ended) return;
   match.ended = true;
 
-  const winner = match.players[winnerId];
+  const players = Object.values(match.players);
+
+  // Primary: most points. Tiebreak: most correct answers.
+  const [p1, p2] = players;
+  let winner: MatchPlayer;
+
+  if (p1.score > p2.score) {
+    winner = p1;
+  } else if (p2.score > p1.score) {
+    winner = p2;
+  } else {
+    // Tiebreak by correct count
+    const c1 = state?.correctCount[p1.id] ?? 0;
+    const c2 = state?.correctCount[p2.id] ?? 0;
+    winner = c1 >= c2 ? p1 : p2;
+  }
+
+  delete mathState[matchId];
+
   io.to(matchId).emit('game_over', {
     winnerId:   winner.id,
     winnerName: winner.username,
-    players:    Object.values(match.players),
+    players,
   });
 }
 
@@ -487,35 +633,26 @@ io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents, 
 
   // ── Math Sprint ─────────────────────────────────────────────────────────────
 
-  socket.on('math_answer', ({ problemIndex, answer }) => {
+  socket.on('math_answer', ({ questionIndex, answer }) => {
     const { matchId } = socket.data;
     if (!matchId) return;
     const match = matches[matchId];
-    if (!match || match.ended || !match.players[socket.id]) return;
+    const state = mathState[matchId];
+    if (!match || match.ended || !state || !match.players[socket.id]) return;
 
-    const player = match.players[socket.id] as any;
+    // Only accept answer for the current active question
+    if (questionIndex !== state.currentQuestion) return;
 
-    // Only accept answer for the player's current problem
-    if (problemIndex !== player.problemIndex) return;
+    // Only accept first answer per player per question
+    if (state.answers[socket.id] !== null) return;
 
-    const prob = match.gameData.problems[problemIndex];
-    if (answer !== prob.answer) return; // wrong — client keeps trying
+    const correct = answer === match.gameData.questions[questionIndex].answer;
+    state.answers[socket.id] = { answeredAt: Date.now(), correct };
 
-    player.score++;
-    player.problemIndex++;
-
-    io.to(matchId).emit('math_correct', { playerId: socket.id, problemIndex });
-    io.to(matchId).emit('math_scores',  { players: Object.values(match.players) });
-
-    if (player.score >= 20) {
-      endMathGame(matchId, socket.id);
-      return;
-    }
-
-    // Send next problem only to this player
-    const nextProb = match.gameData.problems[player.problemIndex];
-    if (nextProb) {
-      socket.emit('math_problem', { problemIndex: player.problemIndex, problem: nextProb.problem });
+    // If both players have answered, resolve immediately
+    const allAnswered = Object.values(state.answers).every((a) => a !== null);
+    if (allAnswered) {
+      resolveMathQuestion(matchId, false);
     }
   });
 
@@ -571,8 +708,11 @@ io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents, 
     if (matchId && matches[matchId] && !matches[matchId].ended) {
       matches[matchId].ended = true;
       io.to(matchId).emit('opponent_disconnected');
-      delete matches[matchId];
+      // Clean up game-specific state
+      if (mathState[matchId]?.questionTimer) clearTimeout(mathState[matchId].questionTimer!);
+      delete mathState[matchId];
       delete triviaAnswered[matchId];
+      delete matches[matchId];
     }
 
     console.log('disconnected:', socket.id);

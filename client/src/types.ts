@@ -55,8 +55,8 @@ export interface TriviaQuestion {
 
 // Math
 export interface MathGameData {
-  problems: MathProblem[];
-  currentProblem: number;
+  questions: MathProblem[];
+  timePerQuestion: number;
 }
 
 export interface MathProblem {

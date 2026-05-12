@@ -3,34 +3,70 @@
   max-width: 600px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
+.math__qnum {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+}
+
+/* ── Question card ── */
 .math__card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
-  padding: 48px 40px;
+  padding: 36px 40px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 32px;
+  gap: 24px;
+  min-height: 280px;
 }
 
+/* ── Timer ── */
+.math__timer-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--surface2);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.math__timer-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 1s linear, background 0.5s;
+}
+
+.math__timer-num {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--mono);
+  align-self: flex-end;
+  margin-top: -16px;
+  min-height: 20px;
+  transition: color 0.5s;
+}
+
+/* ── Problem ── */
 .math__problem {
-  font-size: 56px;
+  font-size: 60px;
   font-weight: 800;
   color: var(--text);
   font-family: var(--mono);
   text-align: center;
   letter-spacing: -2px;
+  line-height: 1;
 }
 
+/* ── Input form ── */
 .math__form {
   display: flex;
   gap: 12px;
   width: 100%;
-  max-width: 360px;
+  max-width: 340px;
 }
 
 .math__input {
@@ -40,11 +76,11 @@
   border-radius: 10px;
   padding: 14px 18px;
   color: var(--text);
-  font-size: 20px;
+  font-size: 22px;
   font-family: var(--mono);
   text-align: center;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .math__input:focus {
@@ -52,7 +88,6 @@
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
-/* hide number input arrows */
 .math__input::-webkit-outer-spin-button,
 .math__input::-webkit-inner-spin-button { -webkit-appearance: none; }
 .math__input[type=number] { -moz-appearance: textfield; }
@@ -66,6 +101,7 @@
   font-size: 16px;
   font-weight: 700;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .math__btn:hover {
@@ -73,30 +109,99 @@
   transform: translateY(-1px);
 }
 
-.math__progress {
+/* ── Waiting state ── */
+.math__waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-dim);
+  font-size: 15px;
+}
+
+.math__spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Per-question result ── */
+.math__result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.math__result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  gap: 12px;
+}
+
+.math__result-row--correct {
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid rgba(74, 222, 128, 0.25);
+  color: var(--green);
+}
+
+.math__result-row--wrong {
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+  color: var(--text-dim);
+}
+
+.math__result-pts {
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-left: auto;
+}
+
+/* ── Running totals ── */
+.math__totals {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.math__progress-bar {
-  height: 10px;
-  background: var(--surface2);
-  border-radius: 99px;
-  overflow: hidden;
+.math__total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.math__progress-fill {
-  height: 100%;
-  border-radius: 99px;
-  transition: width 0.3s ease-out;
+.math__total-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
 }
 
-.math__progress-fill--you {
-  background: linear-gradient(90deg, var(--accent), #f0d060);
-  box-shadow: 0 0 8px var(--accent-glow);
+.math__total-detail {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-family: var(--mono);
 }
 
-.math__progress-fill--opp {
-  background: linear-gradient(90deg, var(--blue), #93c5fd);
+/* ── Hint ── */
+.math__hint {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-dim);
 }
